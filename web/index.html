@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LUD Logistics - AI WCO & SARS Customs Auditor</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <!-- Header -->
+  <header class="app-header">
+    <div class="header-left">
+      <div class="logo-box">
+        <span class="logo-icon">⚖️</span>
+        <div>
+          <h1>LUD LOGISTICS</h1>
+          <p class="tagline">AI WCO & SARS Customs Auditor • Schedule 1 Part 1</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Rate Limit & Quota Monitor -->
+    <div class="header-center">
+      <div class="quota-pill" id="quotaMonitor">
+        <div class="quota-info">
+          <span class="quota-title">Free Tier Quota</span>
+          <span class="quota-rate" id="rpmStatus">0 / 15 RPM</span>
+        </div>
+        <div class="quota-bar-wrapper">
+          <div class="quota-bar" id="quotaBar" style="width: 5%;"></div>
+        </div>
+        <span class="quota-tag" id="quotaStatusText">Pacing: 4.2s delay</span>
+      </div>
+    </div>
+
+    <!-- Right Controls -->
+    <div class="header-right">
+      <div class="api-key-container">
+        <input type="password" id="geminiApiKey" placeholder="Enter Gemini API Key (or use Mock Mode)" class="api-input">
+        <button id="toggleApiKey" class="btn btn-secondary btn-sm" title="Toggle visibility">👁️</button>
+      </div>
+      <div class="mock-toggle-box">
+        <label class="switch">
+          <input type="checkbox" id="mockModeToggle" checked>
+          <span class="slider round"></span>
+        </label>
+        <span class="mock-label" id="mockLabel">Mock Demo</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Navigation Tabs -->
+  <nav class="mode-nav">
+    <button class="nav-tab active" data-tab="tab-audit">
+      <span class="tab-icon">🔍</span>
+      <span>Workflow 1: Validate & Audit Documents</span>
+    </button>
+    <button class="nav-tab" data-tab="tab-autogen">
+      <span class="tab-icon">⚡</span>
+      <span>Workflow 2: Autogen HS & SARS Codes</span>
+    </button>
+    <button class="nav-tab" data-tab="tab-search">
+      <span class="tab-icon">📖</span>
+      <span>SARS Schedule 1 Tariff Explorer</span>
+    </button>
+  </nav>
+
+  <!-- Main Container -->
+  <main class="main-content">
+
+    <!-- TAB 1: VALIDATE & HIGHLIGHT WORKFLOW -->
+    <section id="tab-audit" class="tab-pane active">
+      <div class="split-view">
+        <!-- Left Panel: Input & Document Uploader -->
+        <div class="panel panel-left">
+          <div class="panel-header">
+            <h3>Document & Line Item Ingestion</h3>
+            <span class="badge badge-info">Gemini 2.5 Flash Vision</span>
+          </div>
+
+          <!-- Drag and Drop Image Box -->
+          <div class="drop-zone" id="dropZone">
+            <input type="file" id="fileInput" accept="image/*,application/pdf" style="display: none;">
+            <div class="drop-zone-prompt" id="dropPrompt">
+              <span class="upload-icon">📄</span>
+              <p><strong>Upload Commercial Invoice / Bill of Entry</strong></p>
+              <p class="drop-sub">Drag & drop image scan or <span class="browse-link">browse files</span></p>
+              <span class="format-note">Supports handwritten HS codes, SAD500 scans, packing lists (PNG, JPG, PDF)</span>
+            </div>
+            <div class="preview-wrapper" id="previewWrapper" style="display: none;">
+              <img id="imagePreview" alt="Document Preview" class="doc-preview">
+              <button id="removeImageBtn" class="btn btn-danger btn-xs remove-img-btn">&times; Remove</button>
+            </div>
+          </div>
+
+          <!-- Document Reference Details -->
+          <div class="form-row">
+            <div class="form-group flex-1">
+              <label for="docReference">Document Ref / Invoice #</label>
+              <input type="text" id="docReference" placeholder="e.g. INV-2026-SA-0482" value="INV-2026-SA-0482">
+            </div>
+            <div class="form-group flex-1">
+              <label for="customsValue">Total Invoice Value (ZAR)</label>
+              <input type="number" id="customsValue" placeholder="150000" value="185000">
+            </div>
+          </div>
+
+          <!-- Manual / Pre-loaded Items Table -->
+          <div class="items-header">
+            <h4>Commercial Line Items</h4>
+            <div class="item-actions">
+              <button id="loadSampleInvoiceBtn" class="btn btn-ghost btn-sm">Load Sample Chemical Invoice</button>
+              <button id="addLineItemBtn" class="btn btn-secondary btn-sm">+ Add Line</button>
+            </div>
+          </div>
+
+          <div class="table-container items-table-wrap">
+            <table class="data-table" id="lineItemsInputTable">
+              <thead>
+                <tr>
+                  <th width="5%">#</th>
+                  <th width="45%">Description & Composition</th>
+                  <th width="25%">Declared / Handwritten HS</th>
+                  <th width="20%">Customs Val (R)</th>
+                  <th width="5%"></th>
+                </tr>
+              </thead>
+              <tbody id="lineItemsInputBody">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Action Button -->
+          <div class="action-footer">
+            <button id="runAuditBtn" class="btn btn-primary btn-lg">
+              <span class="btn-icon">⚡</span> Run WCO & SARS Audit Cross-Check
+            </button>
+          </div>
+        </div>
+
+        <!-- Right Panel: Real-Time Audit Findings -->
+        <div class="panel panel-right">
+          <div class="panel-header">
+            <h3>Audit Findings & Tariff Exposure</h3>
+            <div class="header-actions">
+              <button id="exportPdfBtn" class="btn btn-secondary btn-sm" disabled>
+                <span class="btn-icon">📥</span> Export Official PDF Report
+              </button>
+            </div>
+          </div>
+
+          <!-- Metric Cards -->
+          <div class="metrics-grid">
+            <div class="metric-card metric-total">
+              <span class="metric-label">Items Audited</span>
+              <span class="metric-value" id="metricTotal">0</span>
+            </div>
+            <div class="metric-card metric-green">
+              <span class="metric-label">Compliant</span>
+              <span class="metric-value" id="metricCompliant">0</span>
+            </div>
+            <div class="metric-card metric-amber">
+              <span class="metric-label">Warnings</span>
+              <span class="metric-value" id="metricWarning">0</span>
+            </div>
+            <div class="metric-card metric-red">
+              <span class="metric-label">Critical Mismatches</span>
+              <span class="metric-value" id="metricCritical">0</span>
+            </div>
+          </div>
+
+          <!-- Financial Exposure Alert -->
+          <div class="exposure-banner" id="exposureBanner" style="display: none;">
+            <div class="exposure-icon">⚠️</div>
+            <div class="exposure-details">
+              <strong>Potential SARS Customs Duty Shortfall:</strong>
+              <span class="exposure-amount" id="totalDutyShortfall">R 0.00</span>
+              <span class="exposure-sub" id="penaltySub">SARS Sec 84 Potential Penalty Exposure: R 0.00</span>
+            </div>
+          </div>
+
+          <!-- Results Table -->
+          <div class="audit-results-container" id="auditResultsContainer">
+            <div class="empty-state" id="emptyStateAudit">
+              <span class="empty-icon">📋</span>
+              <p>Upload a document or load sample items, then click <strong>Run WCO & SARS Audit Cross-Check</strong></p>
+            </div>
+
+            <div id="auditCardsList" class="audit-cards-list" style="display: none;">
+              <!-- Dynamic Cards -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- TAB 2: AUTOGEN HS CODES WORKFLOW -->
+    <section id="tab-autogen" class="tab-pane">
+      <div class="split-view">
+        <!-- Left: Product Input -->
+        <div class="panel panel-left">
+          <div class="panel-header">
+            <h3>Direct Tariff Auto-Classification</h3>
+            <span class="badge badge-info">WCO GRI 1-6 Engine</span>
+          </div>
+
+          <div class="form-group">
+            <label for="autogenProductName">Product Commercial / Trade Name</label>
+            <input type="text" id="autogenProductName" placeholder="e.g. SyntheLube High-Speed Cutting Fluid" value="Industrial High-Performance Synthetic Cutting Fluid">
+          </div>
+
+          <div class="form-group">
+            <label for="autogenComposition">Ingredients & Composition (% by weight)</label>
+            <textarea id="autogenComposition" rows="3" placeholder="e.g. 25% petroleum lubricating oil, 65% polyalphaolefin synthetic oil, 10% extreme pressure sulfurized ester additives">22% petroleum lubricating base oil, 68% synthetic polyalkylene glycol polymer, 10% anti-wear and corrosion inhibitors</textarea>
+            <small class="form-tip">Thresholds matter: Chapter 27 requires &gt;= 70% petroleum oil; Chapter 34 applies to &lt; 70% oil.</small>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group flex-1">
+              <label for="autogenState">Physical State / Form</label>
+              <select id="autogenState">
+                <option value="Liquid">Liquid / Fluid</option>
+                <option value="Paste / Grease">Paste / Semi-solid / Grease</option>
+                <option value="Solid / Powder">Solid / Powder / Granule</option>
+                <option value="Aerosol spray">Aerosol Spray</option>
+                <option value="Articles / Fabricated">Finished Article (Brake pads, discs)</option>
+              </select>
+            </div>
+            <div class="form-group flex-1">
+              <label for="autogenPackaging">Packaging / Net Weight</label>
+              <select id="autogenPackaging">
+                <option value="Bulk packaging (> 5 kg / 200L Drum)">Bulk packaging (&gt; 5 kg / 200L Drum)</option>
+                <option value="Retail package <= 1 kg (Glues)">Retail package &lt;= 1 kg (Glues - 3506.10)</option>
+                <option value="Retail package <= 5 kg (Detergents)">Retail package &lt;= 5 kg (Detergents - 3402.90)</option>
+                <option value="Other">Standard commercial shipping</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="autogenFunction">Intended End-Use / Function</label>
+            <input type="text" id="autogenFunction" placeholder="e.g. Metalworking lubrication and heat dissipation" value="Industrial metal machining, cooling and lubrication in CNC milling">
+          </div>
+
+          <!-- Quick presets -->
+          <div class="preset-box">
+            <label>Quick Industrial Test Presets:</label>
+            <div class="preset-buttons">
+              <button class="preset-btn" data-preset="cutting_oil">Synthetic Cutting Fluid (Ch 34)</button>
+              <button class="preset-btn" data-preset="superglue">Cyanoacrylate Retail Glue (Ch 35)</button>
+              <button class="preset-btn" data-preset="diesel_fuel">Low Sulfur Diesel Fuel (Ch 27)</button>
+              <button class="preset-btn" data-preset="brake_pads">Ceramic Brake Pads (Ch 68)</button>
+            </div>
+          </div>
+
+          <div class="action-footer">
+            <button id="runAutogenBtn" class="btn btn-primary btn-lg">
+              <span class="btn-icon">⚡</span> Classify Goods via WCO GRI & SARS
+            </button>
+          </div>
+        </div>
+
+        <!-- Right: Auto-Gen Output -->
+        <div class="panel panel-right">
+          <div class="panel-header">
+            <h3>Generated Legal Classification</h3>
+            <span class="badge badge-success">SARS Schedule 1 Verified</span>
+          </div>
+
+          <div id="autogenEmpty" class="empty-state">
+            <span class="empty-icon">🎯</span>
+            <p>Fill in product details and click <strong>Classify Goods via WCO GRI & SARS</strong> to generate full legal tariff breakdown.</p>
+          </div>
+
+          <div id="autogenResultBox" class="autogen-result" style="display: none;">
+            <!-- Primary Code Header Card -->
+            <div class="tariff-hero-card">
+              <div class="tariff-hero-top">
+                <div>
+                  <span class="tariff-subhead-tag" id="resSubheading">Subheading 3403.19</span>
+                  <h2 class="tariff-code-display" id="resFullCode">3403.19.00 / 8</h2>
+                </div>
+                <div class="duty-badge-hero" id="resDutyGeneral">Duty: Free</div>
+              </div>
+              <p class="tariff-desc-display" id="resTariffDescription">
+                Lubricating preparations containing &lt; 70% by weight of petroleum oils (synthetic lubricants, cutting oils)
+              </p>
+            </div>
+
+            <!-- Preferential Duty Rates Matrix -->
+            <div class="duty-rates-matrix">
+              <div class="matrix-cell">
+                <span class="matrix-label">General (MFN)</span>
+                <span class="matrix-val" id="resRateGeneral">Free</span>
+              </div>
+              <div class="matrix-cell">
+                <span class="matrix-label">EU EPA</span>
+                <span class="matrix-val" id="resRateEU">Free</span>
+              </div>
+              <div class="matrix-cell">
+                <span class="matrix-label">SADC Protocol</span>
+                <span class="matrix-val" id="resRateSADC">Free</span>
+              </div>
+              <div class="matrix-cell">
+                <span class="matrix-label">AfCFTA</span>
+                <span class="matrix-val" id="resRateAfCFTA">Free</span>
+              </div>
+            </div>
+
+            <!-- WCO GRI Rationale -->
+            <div class="rationale-box">
+              <h4>WCO General Rules of Interpretation (GRI) Legal Rationale</h4>
+              <div class="rationale-pill" id="resPrimaryGRI">Primary Rule: GRI 1 and GRI 6</div>
+              <p class="rationale-text" id="resRationaleText"></p>
+            </div>
+
+            <!-- Alternative Codes Considered -->
+            <div class="alt-headings-box">
+              <h4>Headings Considered & Excluded</h4>
+              <div id="resAltHeadingsList" class="alt-list"></div>
+            </div>
+
+            <!-- Compliance & Permit Notes -->
+            <div class="compliance-box">
+              <h4>SARS Compliance & Permit Flags</h4>
+              <p id="resComplianceNotes"></p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- TAB 3: SARS TARIFF EXPLORER -->
+    <section id="tab-search" class="tab-pane">
+      <div class="panel full-panel">
+        <div class="panel-header">
+          <h3>SARS Schedule 1 Part 1 Database Explorer</h3>
+          <span class="badge badge-info">Chapters 27, 32, 34, 35, 38, 68</span>
+        </div>
+
+        <div class="search-bar-row">
+          <input type="text" id="tariffSearchInput" placeholder="Search by tariff code, description, or keyword (e.g. 'brake pads', '3402', 'diesel', 'adhesive')..." class="search-input">
+          <button id="searchTariffBtn" class="btn btn-primary">Search</button>
+        </div>
+
+        <div class="table-container">
+          <table class="data-table" id="tariffDbTable">
+            <thead>
+              <tr>
+                <th width="15%">SARS Code / CD</th>
+                <th width="8%">Chapter</th>
+                <th width="42%">Official Tariff Description</th>
+                <th width="10%">General Duty</th>
+                <th width="10%">EU / SADC</th>
+                <th width="5%">Unit</th>
+                <th width="10%">Audit Notes</th>
+              </tr>
+            </thead>
+            <tbody id="tariffDbBody">
+              <!-- Dynamically populated from cache -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="app-footer">
+    <div class="footer-left">
+      <span>LUD Logistics Customs Compliance Platform • WCO Harmonized System 2022/2026 Edition</span>
+    </div>
+    <div class="footer-right">
+      <span>Powered by Google Antigravity &amp; Gemini 2.5 Flash Free Tier Vision</span>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
