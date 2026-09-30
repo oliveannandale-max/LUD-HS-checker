@@ -301,12 +301,12 @@ class CustomsAuditorRequestHandler(BaseHTTPRequestHandler):
 
 
 def run_server(port: int = 8080):
-    server_address = ("127.0.0.1", port)
+    server_address = ("0.0.0.0", port)
     httpd = HTTPServer(server_address, CustomsAuditorRequestHandler)
     print("=" * 70)
     print(f"LUD LOGISTICS - AI WCO & SARS CUSTOMS AUDITOR")
-    print(f"Server running at: http://127.0.0.1:{port}")
-    print(f"Web Interface:     http://127.0.0.1:{port}/index.html")
+    print(f"Local URL:         http://localhost:{port}")
+    print(f"Network URL:       http://0.0.0.0:{port}")
     print(f"Target Model:      Google AI Studio Gemini 2.5 Flash (Free Tier)")
     print(f"Free Tier Limits:  15 RPM / 1500 RPD (Client Queue Enforced: 4.2s)")
     print("=" * 70)
