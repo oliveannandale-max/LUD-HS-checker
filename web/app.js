@@ -326,7 +326,9 @@ async function runAuditWorkflow() {
     items: items,
     image: state.uploadedImageBase64,
     mock_mode: state.mockMode,
-    api_key: apiKey
+    api_key: apiKey,
+    // Perform OCR on uploaded image if available and not in mock mode
+    ocr_text: (state.uploadedImageBase64 && !state.mockMode && window.performOCR) ? await window.performOCR(state.uploadedImageBase64) : null
   };
 
   // 1. Try Local Python Server API first
